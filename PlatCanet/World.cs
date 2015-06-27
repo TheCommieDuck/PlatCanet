@@ -11,6 +11,14 @@ namespace PlatCanet
 {
     class World
     {
+        
+
+        public const int SeaLevel = 60;
+
+        public const int GlacialTemp = -10;
+
+        public const int MountainLevel = 180;
+
         public int Height { get; private set; }
         public int Width { get; private set; }
 
@@ -20,7 +28,7 @@ namespace PlatCanet
 
         public VoronoiMap VoronoiMap { get; private set; }
 
-        public HashSet<HashSet<MapCell>> Regions { get; private set; }
+        public HashSet<HashSet<RegionCell>> Regions { get; private set; }
 
         public World(int width, int height)
         {
@@ -38,6 +46,7 @@ namespace PlatCanet
             Perlin terrType = new Perlin();
             terrType.Persistence = 0.6;
             terrType.Frequency = 0.8;
+            terrType.Seed = 5;
             RidgedMulti ridge = new RidgedMulti();
             ScaleBias scale = new ScaleBias();
             scale.Source0 = ridge;
@@ -49,22 +58,36 @@ namespace PlatCanet
             select.Source1 = scale;
 
             PlaneNoiseMapBuilder builder = new PlaneNoiseMapBuilder();
-            terrType.Seed = 5;
-            builder.SourceModule = select;// terrType;//select;
+            
+            builder.SourceModule = select;
             builder.DestNoiseMap = Altitude;
             builder.SetDestSize(Width, Height);
             builder.SetBounds(6, 10, 1, 5);
             builder.Build();
             Altitude.Normalize(0f, 1f);
             Altitude.ScaleByGradient(1f);
-            Altitude.Normalize(0, 1);
+            Altitude.Normalize(0, 255);
+
+            terrType.Seed++;
+            builder.DestNoiseMap = Moisture;
+            builder.SetDestSize(Width, Height);
+            builder.SetBounds(6, 10, 1, 5);
+            builder.Build();
+            Moisture.Normalize(0, 40);
+
+            terrType.Seed++;
+            builder.DestNoiseMap = Temperature;
+            builder.SetDestSize(Width, Height);
+            builder.SetBounds(6, 10, 1, 5);
+            builder.Build();
+            Temperature.Normalize(-30, 50);
         }
 
         public void GenerateVoronoiMap()
         {
             List<Vector2f> vertices = new List<Vector2f>();
             Random r = new Random();
-            for (int i = 0; i < 10000; ++i)
+            for (int i = 0; i < 20000; ++i)
                 vertices.Add(new Vector2f(r.NextDouble() * Width, r.NextDouble() * Height));
             VoronoiMap = new VoronoiMap(vertices, Width, Height);
             CreateRegions();
@@ -72,36 +95,61 @@ namespace PlatCanet
 
         private void CreateRegions()
         {
-            List<HashSet<MapCell>> regions = new List<HashSet<MapCell>>();
+            List<HashSet<RegionCell>> regions = new List<HashSet<RegionCell>>();
             HashSet<Site> unprocessedSites = new HashSet<Site>(VoronoiMap.Voronoi.SitesIndexedByLocation.Values);
-            Queue<MapCell> processQueue = new Queue<MapCell>();
+            Queue<RegionCell> processQueue = new Queue<RegionCell>();
 
             while (unprocessedSites.Count > 0)
             {
                 Site first = unprocessedSites.First();
-                processQueue.Enqueue(new MapCell(first, Classify(first)));
+                processQueue.Enqueue(new RegionCell(first, Classify(first.Coord)));
                 unprocessedSites.Remove(first);
-
-                HashSet<MapCell> currentRegion = new HashSet<MapCell>();
+                HashSet<RegionCell> currentRegion = new HashSet<RegionCell>();
                 regions.Add(currentRegion);
 
                 while (processQueue.Count > 0)
                 {
-                    MapCell current = processQueue.Dequeue();
+                    RegionCell current = processQueue.Dequeue();
                     currentRegion.Add(current);
-                    foreach (Site s in current.Site.NeighborSites().Where(t => Classify(t) == current.Classification && unprocessedSites.Contains(t)))
+                    foreach (Site s in current.Site.NeighborSites())
                     {
-                        processQueue.Enqueue(new MapCell(s, Classify(s)));
+                        Biome b = Classify(s.Coord);
+                        if (b != current.Classification || !unprocessedSites.Contains(s))
+                            continue;
+                        processQueue.Enqueue(new RegionCell(s, b));
                         unprocessedSites.Remove(s);
                     }
                 }
             }
-            Regions = new HashSet<HashSet<MapCell>>(regions);
+            Regions = new HashSet<HashSet<RegionCell>>(regions);
         }
 
-        public int Classify(Site s)
+        public Biome Classify(Vector2f s)
         {
-            return Altitude[(int)s.Coord.X, (int)s.Coord.Y] > (60f / 255f) ? 1 : 0;
+            return Classify((int)s.X, (int)s.Y);
+        }
+        public Biome Classify(int x, int y)
+        {
+            float temp = Temperature[x, y], height = Altitude[x, y], moisture = Moisture[x, y];
+            if(height < World.SeaLevel)
+                return temp < World.GlacialTemp ? Biome.Glacier : Biome.Lake; //make it all lakes, then flood-fill the oceanic region after.
+
+            if (height > World.MountainLevel)
+                return Biome.Mountain;
+
+            if (temp < -10)
+                return Biome.Arctic;
+            if (temp < 0)
+                return moisture > 10 ? Biome.AlpineTundra : Biome.Tundra;
+            if(temp < 20)
+            {
+                if (moisture < 10)
+                    return moisture > 5 ? Biome.Shrubland : Biome.Grasslands;
+                if (temp < 10)
+                    return Biome.BorealForest;
+                return moisture < 13 ? Biome.Savanna : moisture < 20 ? Biome.TemperateForest : Biome.Rainforest;
+            }
+            return moisture < 8 ? Biome.Desert : moisture < 20 ? Biome.TropicalForest : Biome.TropicalRainforest;
         }
     }
 }

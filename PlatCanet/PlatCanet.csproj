@@ -54,6 +54,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="BearLibTerminal.cs" />
+    <Compile Include="Biome.cs" />
     <Compile Include="ColorHelper.cs" />
     <Compile Include="Heightmap.cs" />
     <Compile Include="Game.cs" />
