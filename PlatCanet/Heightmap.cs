@@ -41,7 +41,21 @@ namespace PlatCanet
                     this.SetValue(x, y, this.GetValue(x, y) * gradVal);
                 }
             }
-            
+        }
+
+        public void ScaleByCentre()
+        {
+            for (int x = 0; x < Width; x++)
+            {
+                for (int y = 0; y < Height; ++y)
+                {
+                    float ny = Math.Abs((2f * y / (float)Height) - 1);
+                    float dist = (ny * ny);
+
+                    float gradVal = Math.Max(0.5f, ny);
+                    this.SetValue(x, y, this.GetValue(x, y) * gradVal);
+                }
+            }
         }
     }
 }

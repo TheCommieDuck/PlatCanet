@@ -17,7 +17,7 @@ namespace PlatCanet
 
         public const int GlacialTemp = -10;
 
-        public const int MountainLevel = 180;
+        public const int MountainLevel = 235;
 
         public int Height { get; private set; }
         public int Width { get; private set; }
@@ -37,50 +37,61 @@ namespace PlatCanet
             this.Altitude = new Heightmap(width, height);
             this.Temperature = new Heightmap(width, height);
             this.Moisture = new Heightmap(width, height);
-            GenerateNoiseMap();
+            GenerateAltitudeMap();
             GenerateVoronoiMap();
         }
 
-        public void GenerateNoiseMap()
+        public void GenerateAltitudeMap()
         {
-            Perlin terrType = new Perlin();
-            terrType.Persistence = 0.6;
-            terrType.Frequency = 0.8;
-            terrType.Seed = 5;
-            RidgedMulti ridge = new RidgedMulti();
-            ScaleBias scale = new ScaleBias();
-            scale.Source0 = ridge;
-            scale.Scale = 0.5f;
-            scale.Bias = 0.3f;
-            Simplex sim = new Simplex();
-            Add select = new Add();
-            select.Source0 = terrType;
-            select.Source1 = scale;
-
             PlaneNoiseMapBuilder builder = new PlaneNoiseMapBuilder();
+
+            Perlin terrainNoiseBase = new Perlin();
+            terrainNoiseBase.Persistence = 0.6;
+            terrainNoiseBase.Frequency = 0.8;
+            terrainNoiseBase.Seed = 5;
+
+            RidgedMulti terrainRidge = new RidgedMulti();
+
+            ScaleBias terrainScale = new ScaleBias();
+            terrainScale.Source0 = terrainRidge;
+            terrainScale.Scale = 1.5f;
+            terrainScale.Bias = 0.3f;
+
+            Add terrainAdd = new Add();
+            terrainAdd.Source0 = terrainNoiseBase;
+            terrainAdd.Source1 = terrainScale;
             
-            builder.SourceModule = select;
+            builder.SourceModule = terrainAdd;
             builder.DestNoiseMap = Altitude;
             builder.SetDestSize(Width, Height);
             builder.SetBounds(6, 10, 1, 5);
             builder.Build();
+
             Altitude.Normalize(0f, 1f);
             Altitude.ScaleByGradient(1f);
             Altitude.Normalize(0, 255);
 
-            terrType.Seed++;
+            terrainNoiseBase.Seed++;
             builder.DestNoiseMap = Moisture;
             builder.SetDestSize(Width, Height);
             builder.SetBounds(6, 10, 1, 5);
             builder.Build();
-            Moisture.Normalize(0, 40);
+            Moisture.Normalize(0, 1);
 
-            terrType.Seed++;
+            Perlin tempNoiseBase = new Perlin();
+            tempNoiseBase.Persistence = 0.1;
+            tempNoiseBase.Frequency = 0.8;
+            tempNoiseBase.Seed = 7;
+            Exponent exp = new Exponent();
+            exp.Exp = 1.05f;
+            exp.Source0 = tempNoiseBase;
+
+            builder.SourceModule = exp;
             builder.DestNoiseMap = Temperature;
             builder.SetDestSize(Width, Height);
-            builder.SetBounds(6, 10, 1, 5);
+            builder.SetBounds(0, 10, 0, 5);
             builder.Build();
-            Temperature.Normalize(-30, 50);
+            Temperature.Normalize(0, 1);
         }
 
         public void GenerateVoronoiMap()
@@ -137,7 +148,7 @@ namespace PlatCanet
             if (height > World.MountainLevel)
                 return Biome.Mountain;
 
-            if (temp < -10)
+            if (temp < -13)
                 return Biome.Arctic;
             if (temp < 0)
                 return moisture > 10 ? Biome.AlpineTundra : Biome.Tundra;
