@@ -15,10 +15,15 @@ namespace PlatCanet
 
         public const int SeaLevel = 60;
 
-        public const int GlacialTemp = -10;
+        public const int BeachEnd = 65;
+
+        public const float GlacialTemp = 0.06f;
 
         public const int MountainLevel = 235;
 
+        public const int BeachThreshold = 4;
+
+        public int Seed { get; private set; }
         public int Height { get; private set; }
         public int Width { get; private set; }
 
@@ -37,6 +42,8 @@ namespace PlatCanet
             this.Altitude = new Heightmap(width, height);
             this.Temperature = new Heightmap(width, height);
             this.Moisture = new Heightmap(width, height);
+            Random r = new Random();
+            Seed = r.Next(300);
             GenerateAltitudeMap();
             GenerateVoronoiMap();
         }
@@ -44,17 +51,17 @@ namespace PlatCanet
         public void GenerateAltitudeMap()
         {
             PlaneNoiseMapBuilder builder = new PlaneNoiseMapBuilder();
-
+            
             Perlin terrainNoiseBase = new Perlin();
             terrainNoiseBase.Persistence = 0.6;
             terrainNoiseBase.Frequency = 0.8;
-            terrainNoiseBase.Seed = 5;
+            terrainNoiseBase.Seed = Seed;
 
             RidgedMulti terrainRidge = new RidgedMulti();
 
             ScaleBias terrainScale = new ScaleBias();
             terrainScale.Source0 = terrainRidge;
-            terrainScale.Scale = 1.5f;
+            terrainScale.Scale = 1.2f;
             terrainScale.Bias = 0.3f;
 
             Add terrainAdd = new Add();
@@ -69,21 +76,32 @@ namespace PlatCanet
 
             Altitude.Normalize(0f, 1f);
             Altitude.ScaleByGradient(1f);
-            Altitude.Normalize(0, 255);
+            Altitude.Normalize(0, 1);
 
-            terrainNoiseBase.Seed++;
+            Perlin moistureNoiseBase = new Perlin();
+            moistureNoiseBase.Persistence = 0.03;
+            moistureNoiseBase.Frequency = 0.6;
+            moistureNoiseBase.OctaveCount = 8;
+            moistureNoiseBase.Seed = Seed;
+
+            Exponent exp = new Exponent();
+            exp.Exp = 1.3f;
+            exp.Source0 = moistureNoiseBase;
+
+            builder.SourceModule = exp;// moistureNoiseBase;
             builder.DestNoiseMap = Moisture;
             builder.SetDestSize(Width, Height);
             builder.SetBounds(6, 10, 1, 5);
             builder.Build();
             Moisture.Normalize(0, 1);
+            Moisture.LerpByInverse(Altitude, 0.4f);
+            Moisture.Normalize(0, 1);
 
             Perlin tempNoiseBase = new Perlin();
-            tempNoiseBase.Persistence = 0.1;
-            tempNoiseBase.Frequency = 0.8;
-            tempNoiseBase.Seed = 7;
-            Exponent exp = new Exponent();
-            exp.Exp = 1.05f;
+            tempNoiseBase.Persistence = 0.03;
+            tempNoiseBase.Frequency = 0.6;
+            tempNoiseBase.OctaveCount = 8;
+            tempNoiseBase.Seed = Seed;
             exp.Source0 = tempNoiseBase;
 
             builder.SourceModule = exp;
@@ -92,12 +110,17 @@ namespace PlatCanet
             builder.SetBounds(0, 10, 0, 5);
             builder.Build();
             Temperature.Normalize(0, 1);
+            Temperature.LerpByInverse(Altitude, 0.35f);
+            Temperature.ScaleByCentre();
+            Temperature.Normalize(0, 1);
+
+            Altitude.Normalize(0, 255);
         }
 
         public void GenerateVoronoiMap()
         {
             List<Vector2f> vertices = new List<Vector2f>();
-            Random r = new Random();
+            Random r = new Random(Seed);
             for (int i = 0; i < 20000; ++i)
                 vertices.Add(new Vector2f(r.NextDouble() * Width, r.NextDouble() * Height));
             VoronoiMap = new VoronoiMap(vertices, Width, Height);
@@ -142,25 +165,28 @@ namespace PlatCanet
         public Biome Classify(int x, int y)
         {
             float temp = Temperature[x, y], height = Altitude[x, y], moisture = Moisture[x, y];
-            if(height < World.SeaLevel)
+
+            if (height < World.SeaLevel)
                 return temp < World.GlacialTemp ? Biome.Glacier : Biome.Lake; //make it all lakes, then flood-fill the oceanic region after.
 
+            if (height > World.SeaLevel && height < BeachEnd)
+                return Biome.Beach;
             if (height > World.MountainLevel)
                 return Biome.Mountain;
 
-            if (temp < -13)
+            if (temp < 0.2f)
                 return Biome.Arctic;
-            if (temp < 0)
-                return moisture > 10 ? Biome.AlpineTundra : Biome.Tundra;
-            if(temp < 20)
+            if (temp < 0.30f)
+                return moisture > 0.45f ? Biome.AlpineTundra : Biome.Tundra;
+            if(temp < 0.60f)
             {
-                if (moisture < 10)
+                if (moisture < 0.25f)
                     return moisture > 5 ? Biome.Shrubland : Biome.Grasslands;
-                if (temp < 10)
+                if (temp < 0.4f)
                     return Biome.BorealForest;
-                return moisture < 13 ? Biome.Savanna : moisture < 20 ? Biome.TemperateForest : Biome.Rainforest;
+                return moisture < 0.35f ? Biome.Savanna : moisture < 0.5f ? Biome.TemperateForest : Biome.Rainforest;
             }
-            return moisture < 8 ? Biome.Desert : moisture < 20 ? Biome.TropicalForest : Biome.TropicalRainforest;
+            return moisture < 0.25f ? Biome.Desert : moisture < 0.5f ? Biome.TropicalForest : Biome.TropicalRainforest;
         }
     }
 }

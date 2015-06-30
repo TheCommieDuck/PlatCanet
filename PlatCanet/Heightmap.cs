@@ -52,9 +52,21 @@ namespace PlatCanet
                     float ny = Math.Abs((2f * y / (float)Height) - 1);
                     float dist = (ny * ny);
 
-                    float gradVal = Math.Max(0.5f, ny);
-                    this.SetValue(x, y, this.GetValue(x, y) * gradVal);
+                    float gradVal = dist * 1.1f;
+                    this.SetValue(x, y, this.GetValue(x, y) * Math.Max(0.1f, (1-gradVal)));
                 }
+            }
+        }
+
+        public void LerpByInverse(Heightmap other, float coef)
+        {
+            for (int x = 0; x < Width; x++)
+            {
+                for (int y = 0; y < Height; ++y)
+                {
+                    this.SetValue(x, y, this.GetValue(x, y) + ((1.01f - other[x, y] - this.GetValue(x, y)) * coef));
+                }
+                    
             }
         }
     }

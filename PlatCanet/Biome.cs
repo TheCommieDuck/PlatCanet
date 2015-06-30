@@ -24,6 +24,7 @@ namespace PlatCanet
         TropicalForest,
         TropicalRainforest,
         Mountain,
+        Beach,
         NoBiome = Int32.MaxValue
     }
 }
