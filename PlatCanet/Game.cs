@@ -75,7 +75,11 @@ namespace PlatCanet
 
         public World World { get; set; }
 
+        public Window Window { get; set; }
+
         public bool IsRunning { get; set; }
+
+        private Panel mapPanel;
 
         public DisplayType CurrentDisplayMode { get; set; }
 
@@ -90,9 +94,9 @@ namespace PlatCanet
             Init();
             while (IsRunning)
             {
-                for (int x = 0; x < World.Width; x++)
+                for (int x = 0; x < mapPanel.Width*2; x++)
                 {
-                    for (int y = 0; y < World.Height; y++)
+                    for (int y = 0; y < mapPanel.Height*2; y++)
                     {
                         Color col = Color.Black;
                         int val = 0;
@@ -162,7 +166,7 @@ namespace PlatCanet
                                     
                                 break;
                         }
-                        Terminal.Color(col);
+                        Window.SetColour(col);
                         SubcellRender(x, y);
                     }
                 }
@@ -178,20 +182,14 @@ namespace PlatCanet
                             int x = (int)point.X;
                             int y = (int)point.Y;
                             float val = (World.Altitude.GetValue(x, y));
-                            Terminal.Color(col);
+                            Window.SetColour(col);
                             SubcellRender(x, y);
                         }
                     }
                 }
 
-                Terminal.Refresh();
-                int totalLand = biomeCount.Values.Aggregate(0, (land, moreLand) => land += moreLand);
-                totalLand -= biomeCount[Biome.Ocean] + biomeCount[Biome.Lake] + biomeCount[Biome.Glacier];
-                foreach(var pair in biomeCount.OrderBy<KeyValuePair<Biome, int>, int>((pair) => pair.Value))
-                {
-                    Console.WriteLine("{0} : {1}, {2}%", pair.Key.ToString(), pair.Value, pair.Value*100f/totalLand);
-                }
-                Console.WriteLine("Seed: {0}", World.Seed);
+                Window.Refresh();
+                
                 ReadCommand();
             }
         }
@@ -199,13 +197,22 @@ namespace PlatCanet
         private void ReadCommand()
         {
             string[] input = Console.ReadLine().Split(' ');
-            if (input.Length < 2)
-                return;
             switch(input[0])
             {
                 case "d":
+                    if (input.Length < 2)
+                        return;
                     CurrentDisplayMode = (DisplayType)Enum.Parse(typeof(DisplayType), input[1]);
                     break;
+                case "i":
+                    int totalLand = biomeCount.Values.Aggregate(0, (land, moreLand) => land += moreLand);
+                totalLand -= biomeCount[Biome.Ocean] + biomeCount[Biome.Lake] + biomeCount[Biome.Glacier];
+                foreach(var pair in biomeCount.OrderBy<KeyValuePair<Biome, int>, int>((pair) => pair.Value))
+                {
+                    Console.WriteLine("{0} : {1}, {2}%", pair.Key.ToString(), pair.Value, pair.Value*100f/totalLand);
+                }
+                Console.WriteLine("Seed: {0}", World.Seed);
+                break;
                 default:
                     break;
             }
@@ -216,17 +223,30 @@ namespace PlatCanet
             int dx = (x % 2) * 4;
             int dy = (y % 2) * 4;
             Terminal.Layer((int)((dx / 4) + (0.5 * dy)));
-            Terminal.PutExt((int)Math.Floor(x / 2f), (int)Math.Floor(y / 2f), dx, dy, 9624);
+            Window.PutExt(mapPanel, (int)Math.Floor(x / 2f), (int)Math.Floor(y / 2f), dx, dy, 9624);
         }
 
         public void Init()
         {
-            Terminal.Open();
-            Terminal.Set("window: size=160x100, cellsize=8x8, title='MICK IS A LETTUCE-LOVING SHITBAG'; font=default");
-            Terminal.BkColor(Color.Black);
-            Terminal.Clear();
-            Terminal.Refresh();
-            this.World = new World(320, 200);
+            Window = new Window(161, 101, "Faux remains a shitbag");
+            mapPanel = Window.CreatePanel(new Rectangle(40, 0, 120, 60));
+            Panel otherPanel = Window.CreatePanel(new Rectangle(5, 5, 10, 10));
+            Panel thirdPanel = Window.CreatePanel(new Rectangle(40, 60, 120, 40));
+            Panel forthPanel = Window.CreatePanel(new Rectangle(0, 0, 40, 100));
+
+            for (int x = 0; x < 40; ++x)
+            {
+                for(int y = 0; y < 10; ++y)
+                {
+                    Window.Put(otherPanel, x, y, x > y ? x.ToString()[0] : y.ToString()[0]);
+                }
+            }
+            Window.DrawBorders(otherPanel);
+            Window.DrawBorders(mapPanel);
+            Window.DrawBorders(thirdPanel);
+            Window.DrawBorders(forthPanel);
+            Window.Refresh();
+            this.World = new World(240, 120);
             foreach (Biome b in biomeColours.Keys)
                 biomeCount[b] = 0;
         }

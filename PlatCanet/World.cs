@@ -5,6 +5,7 @@ using SharpNoise.Builders;
 using SharpNoise.Modules;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 
 namespace PlatCanet
@@ -45,11 +46,88 @@ namespace PlatCanet
             Random r = new Random();
             Seed = r.Next(300);
             GenerateAltitudeMap();
+
             GenerateVoronoiMap();
+        }
+
+        public void GenerateAltitudeSimplex()
+        {
+            Stopwatch watch = new Stopwatch();
+            watch.Start();
+            PlaneNoiseMapBuilder builder = new PlaneNoiseMapBuilder();
+
+            int regionStart = Seed * 10, regionSize = regionStart + 5;
+            Simplex terrainNoiseBase = new Simplex();
+            terrainNoiseBase.Persistence = 0.6;
+            terrainNoiseBase.Frequency = 0.8;
+            //terrainNoiseBase.Seed = Seed;
+
+            RidgedMulti terrainRidge = new RidgedMulti();
+
+            ScaleBias terrainScale = new ScaleBias();
+            terrainScale.Source0 = terrainRidge;
+            terrainScale.Scale = 1.2f;
+            terrainScale.Bias = 0.3f;
+
+            Add terrainAdd = new Add();
+            terrainAdd.Source0 = terrainNoiseBase;
+            terrainAdd.Source1 = terrainScale;
+
+            builder.SourceModule = terrainAdd;
+            builder.DestNoiseMap = Altitude;
+            builder.SetDestSize(Width, Height);
+            builder.SetBounds(regionStart, regionSize, regionStart, regionSize);
+            builder.Build();
+
+            Altitude.Normalize(0f, 1f);
+            Altitude.ScaleByGradient(1f);
+            Altitude.Normalize(0, 1);
+
+            Simplex moistureNoiseBase = new Simplex();
+            moistureNoiseBase.Persistence = 0.03;
+            moistureNoiseBase.Frequency = 0.6;
+            moistureNoiseBase.OctaveCount = 8;
+            //moistureNoiseBase.Seed = Seed;
+
+            Exponent exp = new Exponent();
+            exp.Exp = 1.3f;
+            exp.Source0 = moistureNoiseBase;
+
+            builder.SourceModule = exp;// moistureNoiseBase;
+            builder.DestNoiseMap = Moisture;
+            builder.SetDestSize(Width, Height);
+            builder.SetBounds(regionStart, regionSize, regionStart, regionSize);
+            builder.Build();
+            Moisture.Normalize(0, 1);
+            Moisture.LerpByInverse(Altitude, 0.4f);
+            Moisture.Normalize(0, 1);
+
+            Simplex tempNoiseBase = new Simplex();
+            tempNoiseBase.Persistence = 0.03;
+            tempNoiseBase.Frequency = 0.6;
+            tempNoiseBase.OctaveCount = 8;
+            //tempNoiseBase.Seed = Seed;
+            exp.Source0 = tempNoiseBase;
+
+            builder.SourceModule = exp;
+            builder.DestNoiseMap = Temperature;
+            builder.SetDestSize(Width, Height);
+            builder.SetBounds(regionStart - 5, regionSize, regionStart - 5, regionSize);
+            builder.Build();
+            Temperature.Normalize(0, 1);
+            Temperature.LerpByInverse(Altitude, 0.35f);
+            Temperature.ScaleByCentre();
+            Temperature.Normalize(0, 1);
+
+            Altitude.Normalize(0, 255);
+            watch.Stop();
+            Console.WriteLine("Simplex time: " + watch.ElapsedMilliseconds);
         }
 
         public void GenerateAltitudeMap()
         {
+            Stopwatch watch = new Stopwatch();
+            watch.Start();
             PlaneNoiseMapBuilder builder = new PlaneNoiseMapBuilder();
             
             Perlin terrainNoiseBase = new Perlin();
@@ -115,6 +193,8 @@ namespace PlatCanet
             Temperature.Normalize(0, 1);
 
             Altitude.Normalize(0, 255);
+            watch.Stop();
+            Console.WriteLine("Perlin time: " + watch.ElapsedMilliseconds);
         }
 
         public void GenerateVoronoiMap()
