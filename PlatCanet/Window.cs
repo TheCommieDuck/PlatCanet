@@ -24,6 +24,12 @@ namespace PlatCanet
 
         private Color currColor = Color.Black;
 
+        private int currLayer = 0;
+
+        private readonly int[] mouseEvents = new int[] { Terminal.TK_MOUSE_LEFT, Terminal.TK_MOUSE_RIGHT, Terminal.TK_MOUSE_MIDDLE, Terminal.TK_MOUSE_SCROLL };
+
+        private Dictionary<Rectangle, Action<int, int>> buttons;
+
         public Window(int width, int height, string title)
         {
             Width = width;
@@ -35,6 +41,8 @@ namespace PlatCanet
             Terminal.Composition(Terminal.TK_COMPOSITION);
             Terminal.Clear();
             Terminal.Refresh();
+
+            buttons = new Dictionary<Rectangle, Action<int, int>>();
         }
 
         public Panel CreatePanel(Rectangle area, bool hasBorders = true)
@@ -102,6 +110,17 @@ namespace PlatCanet
             if (x < 0 || y < 0 || x >= p.Width || y >= p.Height)
                 return;
 
+            if (currLayer < p.MinLayer)
+            {
+                Terminal.Layer(p.MinLayer);
+                currLayer = p.MinLayer;
+            }
+            else if (currLayer > p.MaxLayer)
+            {
+                Terminal.Layer(p.MaxLayer);
+                currLayer = p.MaxLayer;
+            }
+
             Terminal.PutExt(x + p.X, y + p.Y, dx, dy, c);
             isDirty = true;
         }
@@ -112,11 +131,13 @@ namespace PlatCanet
             {
                 Terminal.Refresh();
                 isDirty = false;
-            } 
+            }
         }
 
         public void DrawBorders(Panel p)
         {
+            Terminal.Layer(p.MaxLayer + 1);
+            currLayer = p.MaxLayer + 1;
             if (!p.HasBorders)
                 return;
             //draw the 4 corners
@@ -139,14 +160,37 @@ namespace PlatCanet
             isDirty = true;
         }
 
-        internal static void ClearArea(Panel panel)
+        public void ClearArea(Panel panel)
         {
             for (int l = panel.MinLayer; l <= panel.MaxLayer; ++l)
             {
                 Terminal.Layer(l);
                 Terminal.ClearArea(panel.X + 1, panel.Y + 1, panel.Width - 1, panel.Height - 1);
             }
-                
+            Terminal.Layer(currLayer);
+        }
+
+        public void HandleMouse(int e)
+        {
+            if (!mouseEvents.Contains(e))
+                return;
+
+            int x = Terminal.State(Terminal.TK_MOUSE_PIXEL_X), y = Terminal.State(Terminal.TK_MOUSE_PIXEL_Y);
+            KeyValuePair<Rectangle, Action<int, int>> action = buttons.FirstOrDefault(b => b.Key.Contains(x, y));
+            if (action.Value != null)
+                action.Value(x-action.Key.X, y-action.Key.Y);
+        }
+
+        public void AddOnClick(Panel p, Rectangle area, Action<int, int> action)
+        {
+            buttons.Add(new Rectangle((area.X + p.X + 1)*CellSize, (area.Y + p.Y + 1)*CellSize, area.Width*CellSize, area.Height*CellSize), action);
+        }
+
+        internal static void Print(Panel panel, int x, int y, string str, params object[] args)
+        {
+            if (x < 0 || y < 0 || x >= panel.Width || y >= panel.Height)
+                return;
+            Terminal.Print(x + panel.X, y + panel.Y, String.Format(str, args));
         }
     }
 }

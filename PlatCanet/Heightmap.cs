@@ -37,7 +37,7 @@ namespace PlatCanet
                     float ny = (2f * y / (float)Height) - 1;
                     float dist = (nx * nx) + (ny * ny);
 
-                    float gradVal = Math.Max(0.2f, (float)(dist > r2 ? (1f - (Math.Pow(radius, 2.5))) : (1f - (Math.Pow(Math.Sqrt(dist), 2.5)))));
+                    float gradVal = Math.Max(0.15f, (float)(dist > r2 ? (1f - (Math.Pow(radius, 2.5))) : (1f - (Math.Pow(Math.Sqrt(dist), 2.5)))));
                     this.SetValue(x, y, this.GetValue(x, y) * gradVal);
                 }
             }

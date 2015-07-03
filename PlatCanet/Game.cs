@@ -62,7 +62,7 @@ namespace PlatCanet
             {Biome.Beach, Color.FromArgb(220, 200, 120)}
         };
 
-        private const int TileSize = 40;
+        private const int TileSize = 10;
 
         public World World { get; set; }
 
@@ -71,6 +71,8 @@ namespace PlatCanet
         public bool IsRunning { get; set; }
 
         private Panel mapPanel;
+
+        private Panel infoPanel;
 
         private Vector2f currPos;
 
@@ -84,10 +86,11 @@ namespace PlatCanet
             Init();
             while (IsRunning)
             {
-                Window.ClearArea(mapPanel);
-                DrawMap();
+                //Window.ClearArea(mapPanel);
+                Draw();
                 HandleInput();
             }
+            Terminal.Close();
         }
 
         private void GenerateMapTextures()
@@ -101,7 +104,7 @@ namespace PlatCanet
                 {
                     for (int by = 0; by < TileSize; by++)
                     {
-                        int x = bx + ((i % tileWidth) * 40), y = by + ((int)Math.Floor((float)(i / tileWidth)) * 40);
+                        int x = bx + ((i % tileWidth) * TileSize), y = by + ((int)Math.Floor((float)(i / tileWidth)) * TileSize);
                         Biome biome = World.Classify(x, y);
                         Color col = Color.Empty;
                         int height = (int)World.Altitude[x, y];
@@ -141,7 +144,7 @@ namespace PlatCanet
 
             foreach(Bitmap map in mapTiles)
             {
-                Terminal.Set("0x{0:X}: {1}, raw-size={3}x{3}, resize={2}x{2}, resize-filter=nearest", tileStart, map, TileSize * 4, TileSize);
+                Terminal.Set("0x{0:X}: {1}, raw-size={3}x{3}, resize={2}x{2}, resize-filter=nearest", tileStart, map, TileSize * Window.CellSize / 2, TileSize);
                 tileStart++;
             }
         }
@@ -156,11 +159,18 @@ namespace PlatCanet
                     Thread.Sleep(1);
                 }
                 read = Terminal.Read();
-                if (read >= Terminal.TK_MOUSE_X1 && read <= Terminal.TK_MOUSE_CLICKS) //mouse
+                if (read == Terminal.TK_MOUSE_MOVE)
                     continue;
                 break;
             }
-
+            if (read >= Terminal.TK_MOUSE_LEFT && read <= Terminal.TK_MOUSE_SCROLL) //mouse
+                Window.HandleMouse(read);
+            if (read == Terminal.TK_CLOSE)
+            {
+                IsRunning = false;
+                return;
+            }
+            
             if (read == Terminal.TK_RIGHT)
                 currPos.X += 1;
             if(read == Terminal.TK_LEFT)
@@ -173,28 +183,69 @@ namespace PlatCanet
 
         public void Init()
         {
-            Window = new Window(162, 102, "Faux is definitely not a shitbag");
+            Window = new Window(162, 102, "PLAT CANET v0.0.0.0.0.0.0.0.0.1");
             mapPanel = Window.CreatePanel(new Rectangle(40, 0, 121, 61));
+            infoPanel = Window.CreatePanel(new Rectangle(40, 61, 121, 40));
+            infoPanel.MinLayer = 5;
+            infoPanel.MaxLayer = 5;
             Window.DrawBorders(mapPanel);
+            Window.DrawBorders(infoPanel);
             Window.Refresh();
             int w = 240, h = 120;
             this.World = new World(w, h);
             GenerateMapTextures();
             currPos = Vector2f.zero;
+            Terminal.Set("0xF000: rainforest.png");
+            Terminal.Set("0xF001: alpinetundra.png");
+            Window.AddOnClick(mapPanel, new Rectangle(0, 0, 120, 60), (wx, wy) => 
+                {
+                    int x = 2*wx/Window.CellSize, y = 2*wy/Window.CellSize;
+                    DisplayDetails(x, y);
+                    /*Console.WriteLine(@"Point: {0}, {1}. 
+Altitude: {2}.
+Moisture: {3}.
+Biome: {4}.", x, y, World.Altitude[x, y], World.Moisture[x, y], World.Classify(x, y));*/
+                });
         }
 
-        private void DrawMap()
+        private void DisplayDetails(int mapX, int mapY)
+        {
+            Window.ClearArea(infoPanel);
+            int x = 3, y = 3;
+
+            
+            Window.Print(infoPanel, x, y+1, "Selected Area:");
+            Window.Print(infoPanel, x, y + 4, "X: {0}, Y: {1}", mapX, mapY);
+            Window.Print(infoPanel, x, y + 8, "Temperature: {0:0.0}°C", (World.Temperature[mapX, mapY] * 70) - 20);
+            Window.Print(infoPanel, x, y + 12, "Rainfall: Approx {0:0.00}mm/year", (World.Moisture[mapX, mapY] * 3500));
+            Window.Print(infoPanel, x, y + 16, "Biome: {0}", 
+                String.Concat(World.Classify(mapX, mapY).ToString().Select(c => Char.IsUpper(c) ? " " + c : c.ToString())).TrimStart(' '));
+            if (World.Classify(mapX, mapY) == Biome.AlpineTundra)
+            {
+                Window.Put(infoPanel, x, y + 20, 0xF001);
+            }
+            else if (World.Classify(mapX, mapY) == Biome.Rainforest)
+            {
+                Window.Put(infoPanel, x, y + 20, 0xF000);
+            }
+
+            Window.DrawBorders(infoPanel);
+            Window.Refresh();
+        }
+
+        private void Draw()
         {
             int t = 0xE000;
-            for (int y = 0; y < 3; y++)
+            for (int y = 0; y < World.Height/TileSize; y++)
             {
-                for(int x = 0; x < 6; ++x)
+                for(int x = 0; x < World.Width/TileSize; ++x)
                 {
-                    Window.Put(mapPanel, (int)((x*20)+currPos.X), (int)((y*20)+currPos.Y), t);
+                    Window.Put(mapPanel, (int)((x * (TileSize / 2)) + currPos.X), (int)((y * (TileSize / 2)) + currPos.Y), t);
                     t++;
                 }
             }
-            Terminal.Refresh();
+            Window.DrawBorders(mapPanel);
+            Window.Refresh();
         }
     }
 }
