@@ -39,18 +39,6 @@
     <Reference Include="csDelaunay">
       <HintPath>..\..\csDelaunay\csDelaunay\bin\Debug\csDelaunay.dll</HintPath>
     </Reference>
-    <Reference Include="sfmlnet-audio-2">
-      <HintPath>..\..\SFML.Net-2.2-sources\SFML.Net-2.2\lib\x64\sfmlnet-audio-2.dll</HintPath>
-    </Reference>
-    <Reference Include="sfmlnet-graphics-2">
-      <HintPath>..\..\SFML.Net-2.2-sources\SFML.Net-2.2\lib\x64\sfmlnet-graphics-2.dll</HintPath>
-    </Reference>
-    <Reference Include="sfmlnet-system-2">
-      <HintPath>..\..\SFML.Net-2.2-sources\SFML.Net-2.2\lib\x64\sfmlnet-system-2.dll</HintPath>
-    </Reference>
-    <Reference Include="sfmlnet-window-2">
-      <HintPath>..\..\SFML.Net-2.2-sources\SFML.Net-2.2\lib\x64\sfmlnet-window-2.dll</HintPath>
-    </Reference>
     <Reference Include="SharpNoise">
       <HintPath>..\packages\SharpNoise.0.10.0.0\lib\net45\SharpNoise.dll</HintPath>
     </Reference>
@@ -86,12 +74,6 @@
     <Content Include="BearLibTerminal.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\PlatTerminal\PlatTerminal.csproj">
-      <Project>{e09d5b7f-a66c-41e3-ae68-61904626513f}</Project>
-      <Name>PlatTerminal</Name>
-    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
