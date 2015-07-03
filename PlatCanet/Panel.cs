@@ -15,6 +15,10 @@ namespace PlatCanet
 
         public int ID;
 
+        public int MinLayer;
+
+        public int MaxLayer;
+
         public int Width
         {
             get

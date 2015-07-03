@@ -12,7 +12,6 @@ namespace PlatCanet
 {
     class World
     {
-        
 
         public const int SeaLevel = 60;
 
@@ -22,8 +21,6 @@ namespace PlatCanet
 
         public const int MountainLevel = 235;
 
-        public const int BeachThreshold = 4;
-
         public int Seed { get; private set; }
         public int Height { get; private set; }
         public int Width { get; private set; }
@@ -32,7 +29,7 @@ namespace PlatCanet
         public Heightmap Temperature { get; private set; }
         public Heightmap Moisture { get; private set; }
 
-        public VoronoiMap VoronoiMap { get; private set; }
+        //public VoronoiMap VoronoiMap { get; private set; }
 
         public HashSet<HashSet<RegionCell>> Regions { get; private set; }
 
@@ -44,7 +41,7 @@ namespace PlatCanet
             this.Temperature = new Heightmap(width, height);
             this.Moisture = new Heightmap(width, height);
             Random r = new Random();
-            Seed = r.Next(300);
+            Seed = r.Next(1000000);
             GenerateAltitudeMap();
 
             GenerateVoronoiMap();
@@ -201,16 +198,16 @@ namespace PlatCanet
         {
             List<Vector2f> vertices = new List<Vector2f>();
             Random r = new Random(Seed);
-            for (int i = 0; i < 20000; ++i)
+            for (int i = 0; i < 2000; ++i)
                 vertices.Add(new Vector2f(r.NextDouble() * Width, r.NextDouble() * Height));
-            VoronoiMap = new VoronoiMap(vertices, Width, Height);
-            CreateRegions();
+            //VoronoiMap = new VoronoiMap(vertices, Width, Height);
+            CreateRegions(new csDelaunay.Voronoi(vertices, new Rectf(0, 0, Width, Height), 1));
         }
 
-        private void CreateRegions()
+        private void CreateRegions(csDelaunay.Voronoi v)
         {
             List<HashSet<RegionCell>> regions = new List<HashSet<RegionCell>>();
-            HashSet<Site> unprocessedSites = new HashSet<Site>(VoronoiMap.Voronoi.SitesIndexedByLocation.Values);
+            HashSet<Site> unprocessedSites = new HashSet<Site>(v.SitesIndexedByLocation.Values);
             Queue<RegionCell> processQueue = new Queue<RegionCell>();
 
             while (unprocessedSites.Count > 0)

@@ -14,9 +14,13 @@ namespace PlatCanet
 
         public int Height { get; private set; }
 
+        public const int CellSize = 8;
+
         private Dictionary<int, Panel> panels;
 
         private int currentPanelID = 0;
+
+        private bool isDirty = false;
 
         private Color currColor = Color.Black;
 
@@ -26,7 +30,7 @@ namespace PlatCanet
             Height = height;
             panels = new Dictionary<int, Panel>();
             Terminal.Open();
-            Terminal.Set(String.Format("window: size={0}x{1}, cellsize=8x8, title='{2}'; font=default", width, height, title));
+            Terminal.Set("window: size={0}x{1}, cellsize={3}x{3}, title='{2}'; font=default", width, height, title, Window.CellSize);
             Terminal.BkColor(Color.Black);
             Terminal.Composition(Terminal.TK_COMPOSITION);
             Terminal.Clear();
@@ -37,6 +41,8 @@ namespace PlatCanet
         {
             Panel p =new Panel();
             p.Area = area;
+            p.MinLayer = 0;
+            p.MaxLayer = 4;
             p.ID = currentPanelID++;
             p.HasBorders = hasBorders;
             panels.Add(p.ID, p);
@@ -97,11 +103,16 @@ namespace PlatCanet
                 return;
 
             Terminal.PutExt(x + p.X, y + p.Y, dx, dy, c);
+            isDirty = true;
         }
 
         public void Refresh()
         {
-            Terminal.Refresh();
+            if(isDirty)
+            {
+                Terminal.Refresh();
+                isDirty = false;
+            } 
         }
 
         public void DrawBorders(Panel p)
@@ -125,6 +136,17 @@ namespace PlatCanet
                 Terminal.Put(p.X, y, '║');
                 Terminal.Put(p.Area.Right, y, '║');
             }
+            isDirty = true;
+        }
+
+        internal static void ClearArea(Panel panel)
+        {
+            for (int l = panel.MinLayer; l <= panel.MaxLayer; ++l)
+            {
+                Terminal.Layer(l);
+                Terminal.ClearArea(panel.X + 1, panel.Y + 1, panel.Width - 1, panel.Height - 1);
+            }
+                
         }
     }
 }
