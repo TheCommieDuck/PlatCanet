@@ -29,7 +29,9 @@ namespace PlatCanet
         public Heightmap Temperature { get; private set; }
         public Heightmap Moisture { get; private set; }
 
-        //public VoronoiMap VoronoiMap { get; private set; }
+        public float[] TemperatureQuantiles { get; private set; }
+
+        public float[] MoistureQuantiles { get; private set; }
 
         public HashSet<HashSet<RegionCell>> Regions { get; private set; }
 
@@ -43,82 +45,53 @@ namespace PlatCanet
             Random r = new Random();
             Seed = r.Next(1000000);
             GenerateAltitudeMap();
-
+            GetQuantiles();
             GenerateVoronoiMap();
         }
 
-        public void GenerateAltitudeSimplex()
+        private void GetQuantiles()
         {
-            Stopwatch watch = new Stopwatch();
-            watch.Start();
-            PlaneNoiseMapBuilder builder = new PlaneNoiseMapBuilder();
+            TemperatureQuantiles = new float[7];
+            List<float> temps = new List<float>();
+            for(int x = 0; x < Width; ++x)
+            {
+                for(int y = 0; y < Height; ++y)
+                {
+                    if(Altitude[x, y] >= SeaLevel)
+                        temps.Add(Temperature[x, y]);
+                }
+            }
+            float[] sortedTemps = temps.OrderBy(t => t).ToArray();
+            int len = sortedTemps.Length;
+            //1/8, 2/8, 3/8, 4/8, 5/8, 6/8, 7/8th quantiles
+            TemperatureQuantiles[0] = sortedTemps[(5 * sortedTemps.Length / 100) - 1];
+            TemperatureQuantiles[1] = sortedTemps[(12 * sortedTemps.Length / 100) - 1];
+            TemperatureQuantiles[2] = sortedTemps[(30 * sortedTemps.Length / 100) - 1];
+            TemperatureQuantiles[3] = sortedTemps[(50 * sortedTemps.Length / 100) - 1];
+            TemperatureQuantiles[4] = sortedTemps[(72 * sortedTemps.Length / 100) - 1];
+            TemperatureQuantiles[5] = sortedTemps[(89 * sortedTemps.Length / 100) - 1];
+            TemperatureQuantiles[6] = sortedTemps[(97 * sortedTemps.Length / 100) - 1];
 
-            int regionStart = Seed * 10, regionSize = regionStart + 5;
-            Simplex terrainNoiseBase = new Simplex();
-            terrainNoiseBase.Persistence = 0.6;
-            terrainNoiseBase.Frequency = 0.8;
-            //terrainNoiseBase.Seed = Seed;
-
-            RidgedMulti terrainRidge = new RidgedMulti();
-
-            ScaleBias terrainScale = new ScaleBias();
-            terrainScale.Source0 = terrainRidge;
-            terrainScale.Scale = 1.2f;
-            terrainScale.Bias = 0.3f;
-
-            Add terrainAdd = new Add();
-            terrainAdd.Source0 = terrainNoiseBase;
-            terrainAdd.Source1 = terrainScale;
-
-            builder.SourceModule = terrainAdd;
-            builder.DestNoiseMap = Altitude;
-            builder.SetDestSize(Width, Height);
-            builder.SetBounds(regionStart, regionSize, regionStart, regionSize);
-            builder.Build();
-
-            Altitude.Normalize(0f, 1f);
-            Altitude.ScaleByGradient(1f);
-            Altitude.Normalize(0, 1);
-
-            Simplex moistureNoiseBase = new Simplex();
-            moistureNoiseBase.Persistence = 0.03;
-            moistureNoiseBase.Frequency = 0.6;
-            moistureNoiseBase.OctaveCount = 8;
-            //moistureNoiseBase.Seed = Seed;
-
-            Exponent exp = new Exponent();
-            exp.Exp = 1.3f;
-            exp.Source0 = moistureNoiseBase;
-
-            builder.SourceModule = exp;// moistureNoiseBase;
-            builder.DestNoiseMap = Moisture;
-            builder.SetDestSize(Width, Height);
-            builder.SetBounds(regionStart, regionSize, regionStart, regionSize);
-            builder.Build();
-            Moisture.Normalize(0, 1);
-            Moisture.LerpByInverse(Altitude, 0.4f);
-            Moisture.Normalize(0, 1);
-
-            Simplex tempNoiseBase = new Simplex();
-            tempNoiseBase.Persistence = 0.03;
-            tempNoiseBase.Frequency = 0.6;
-            tempNoiseBase.OctaveCount = 8;
-            //tempNoiseBase.Seed = Seed;
-            exp.Source0 = tempNoiseBase;
-
-            builder.SourceModule = exp;
-            builder.DestNoiseMap = Temperature;
-            builder.SetDestSize(Width, Height);
-            builder.SetBounds(regionStart - 5, regionSize, regionStart - 5, regionSize);
-            builder.Build();
-            Temperature.Normalize(0, 1);
-            Temperature.LerpByInverse(Altitude, 0.35f);
-            Temperature.ScaleByCentre();
-            Temperature.Normalize(0, 1);
-
-            Altitude.Normalize(0, 255);
-            watch.Stop();
-            Console.WriteLine("Simplex time: " + watch.ElapsedMilliseconds);
+            MoistureQuantiles = new float[7];
+            List<float> moists = new List<float>();
+            for (int x = 0; x < Width; ++x)
+            {
+                for (int y = 0; y < Height; ++y)
+                {
+                    if (Altitude[x, y] >= SeaLevel)
+                        moists.Add(Moisture[x, y]);
+                }
+            }
+            float[] sortedmoist = moists.OrderBy(t => t).ToArray();
+            len = sortedmoist.Length;
+            //1/8, 2/8, 3/8, 4/8, 5/8, 6/8, 7/8th quantiles
+            MoistureQuantiles[0] = sortedmoist[(5 * sortedmoist.Length / 100) - 1];
+            MoistureQuantiles[1] = sortedmoist[(12 * sortedmoist.Length / 100) - 1];
+            MoistureQuantiles[2] = sortedmoist[(30 * sortedmoist.Length / 100) - 1];
+            MoistureQuantiles[3] = sortedmoist[(50 * sortedmoist.Length / 100) - 1];
+            MoistureQuantiles[4] = sortedmoist[(72 * sortedmoist.Length / 100) - 1];
+            MoistureQuantiles[5] = sortedmoist[(89 * sortedmoist.Length / 100) - 1];
+            MoistureQuantiles[6] = sortedmoist[(97 * sortedmoist.Length / 100) - 1];
         }
 
         public void GenerateAltitudeMap()
@@ -151,7 +124,7 @@ namespace PlatCanet
 
             Altitude.Normalize(0f, 1f);
             Altitude.ScaleByGradient(1f);
-            Altitude.Normalize(0, 1);
+            Altitude.Normalize(0, 255);
 
             Perlin moistureNoiseBase = new Perlin();
             moistureNoiseBase.Persistence = 0.03;
@@ -169,7 +142,7 @@ namespace PlatCanet
             builder.SetBounds(6, 10, 1, 5);
             builder.Build();
             Moisture.Normalize(0, 1);
-            Moisture.LerpByInverse(Altitude, 0.4f);
+            Moisture.DistanceFromWater(Altitude);
             Moisture.Normalize(0, 1);
 
             Perlin tempNoiseBase = new Perlin();
@@ -185,13 +158,29 @@ namespace PlatCanet
             builder.SetBounds(0, 10, 0, 5);
             builder.Build();
             Temperature.Normalize(0, 1);
-            Temperature.LerpByInverse(Altitude, 0.35f);
-            Temperature.ScaleByCentre();
-            Temperature.Normalize(0, 1);
 
-            Altitude.Normalize(0, 255);
-            watch.Stop();
-            Console.WriteLine("Perlin time: " + watch.ElapsedMilliseconds);
+            //add some height factor
+            Temperature.Foreach((x, y) =>
+                {
+                    float height = Altitude[x, y];
+                    float factor = 1f;
+                    if (height > 160)
+                    {
+                        if (height > 210)
+                            factor = 0.03f;
+                        else
+                            factor = 1f - ((height - 160) / 50);
+                    }
+                    Temperature[x, y] *= factor;
+                });
+            //and latitudinal stuff
+            Temperature.Foreach((x, y) =>
+                {
+                    float grad = 1f - (Math.Abs(((float)y / Height) - 0.5f) * 2);
+                    Temperature[x, y] = (grad * 5f + Temperature[x, y] * 4f) / 9f;
+                });
+
+            Temperature.Normalize(0, 1);
         }
 
         public void GenerateVoronoiMap()
@@ -200,7 +189,6 @@ namespace PlatCanet
             Random r = new Random(Seed);
             for (int i = 0; i < 2000; ++i)
                 vertices.Add(new Vector2f(r.NextDouble() * Width, r.NextDouble() * Height));
-            //VoronoiMap = new VoronoiMap(vertices, Width, Height);
             CreateRegions(new csDelaunay.Voronoi(vertices, new Rectf(0, 0, Width, Height), 1));
         }
 

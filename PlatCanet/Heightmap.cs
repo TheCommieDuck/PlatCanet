@@ -43,31 +43,84 @@ namespace PlatCanet
             }
         }
 
-        public void ScaleByCentre()
+
+        public void Foreach(Action<int, int> doThing)
         {
             for (int x = 0; x < Width; x++)
             {
                 for (int y = 0; y < Height; ++y)
                 {
-                    float ny = Math.Abs((2f * y / (float)Height) - 1);
-                    float dist = (ny * ny);
-
-                    float gradVal = dist * 1.1f;
-                    this.SetValue(x, y, this.GetValue(x, y) * Math.Max(0.1f, (1-gradVal)));
+                    doThing(x, y);
                 }
             }
         }
 
-        public void LerpByInverse(Heightmap other, float coef)
+        internal void DistanceFromWater(Heightmap height)
         {
+            //First, find the coast - any square where we are next to water.
+            //Then, queue these up and find the nearest tile
+            float[,] distances = new float[Width, Height];
+            float maxDist = 0;
+
+            Queue<Tuple<int, int>> currentPoints = new Queue<Tuple<int,int>>();
             for (int x = 0; x < Width; x++)
             {
                 for (int y = 0; y < Height; ++y)
                 {
-                    this.SetValue(x, y, this.GetValue(x, y) + ((1.01f - other[x, y] - this.GetValue(x, y)) * coef));
+                    if(IsSea(x, y, height))
+                    {
+                        distances[x, y] = 0;
+                        continue;
+                    }
+                    distances[x, y] = -1;
+                    for (int dx = -1; dx < 2; ++dx)
+                    {
+                        for (int dy = -1; dy < 2; ++dy)
+                        {
+                            if (IsSea(x + dx, y + dy, height))
+                            {
+                                currentPoints.Enqueue(new Tuple<int, int>(x, y));
+                                distances[x, y] =  (dy == 0 || dx == 0) ? 1f : 1.33f;
+                                maxDist = Math.Max(distances[x, y], maxDist);
+                            }                                
+                        }
+                    } 
                 }
-                    
             }
+
+            while(currentPoints.Count > 0)
+            {
+                Tuple<int, int> point = currentPoints.Dequeue();
+                int x = point.Item1, y = point.Item2;
+
+                for (int dx = -1; dx < 2; ++dx)
+                {
+                    for(int dy = -1; dy < 2; ++dy)
+                    {
+                        float neighbour = distances[x, y] + ((dy == 0 || dx == 0) ? 1f : 1.33f);
+
+                        if (distances[x + dx, y + dy] == -1 || distances[x + dx, y + dy] > neighbour)
+                        {
+                            distances[x + dx, y + dy] = neighbour;
+                            currentPoints.Enqueue(new Tuple<int, int>(x + dx, y + dy));
+                            maxDist = Math.Max(distances[x, y], maxDist);
+                        }
+                    }
+                }
+            }
+
+            for (int x = 0; x < Width; x++)
+            {
+                for (int y = 0; y < Height; ++y)
+                {
+                    this[x, y] += ((maxDist - distances[x, y])*2f/maxDist);
+                }
+            }
+        }
+
+        private bool IsSea(int x, int y, Heightmap map)
+        {
+            return map[x, y] < World.SeaLevel;
         }
     }
 }
