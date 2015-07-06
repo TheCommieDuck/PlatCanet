@@ -19,7 +19,7 @@ namespace PlatCanet
 
         public const float GlacialTemp = 0.06f;
 
-        public const int MountainLevel = 235;
+        public const int MountainLevel = 200;
 
         public int Seed { get; private set; }
         public int Height { get; private set; }
@@ -51,7 +51,7 @@ namespace PlatCanet
 
         private void GetQuantiles()
         {
-            TemperatureQuantiles = new float[7];
+            TemperatureQuantiles = new float[6];
             List<float> temps = new List<float>();
             for(int x = 0; x < Width; ++x)
             {
@@ -63,14 +63,14 @@ namespace PlatCanet
             }
             float[] sortedTemps = temps.OrderBy(t => t).ToArray();
             int len = sortedTemps.Length;
-            //1/8, 2/8, 3/8, 4/8, 5/8, 6/8, 7/8th quantiles
+
             TemperatureQuantiles[0] = sortedTemps[(5 * sortedTemps.Length / 100) - 1];
-            TemperatureQuantiles[1] = sortedTemps[(12 * sortedTemps.Length / 100) - 1];
-            TemperatureQuantiles[2] = sortedTemps[(30 * sortedTemps.Length / 100) - 1];
-            TemperatureQuantiles[3] = sortedTemps[(50 * sortedTemps.Length / 100) - 1];
-            TemperatureQuantiles[4] = sortedTemps[(72 * sortedTemps.Length / 100) - 1];
-            TemperatureQuantiles[5] = sortedTemps[(89 * sortedTemps.Length / 100) - 1];
-            TemperatureQuantiles[6] = sortedTemps[(97 * sortedTemps.Length / 100) - 1];
+            TemperatureQuantiles[1] = sortedTemps[(20 * sortedTemps.Length / 100) - 1];
+            TemperatureQuantiles[2] = sortedTemps[(32 * sortedTemps.Length / 100) - 1];
+            TemperatureQuantiles[3] = sortedTemps[(53 * sortedTemps.Length / 100) - 1];
+            TemperatureQuantiles[4] = sortedTemps[(68 * sortedTemps.Length / 100) - 1];
+            TemperatureQuantiles[5] = sortedTemps[(90 * sortedTemps.Length / 100) - 1];
+            //TemperatureQuantiles[6] = sortedTemps[(97 * sortedTemps.Length / 100) - 1];
 
             MoistureQuantiles = new float[7];
             List<float> moists = new List<float>();
@@ -92,6 +92,17 @@ namespace PlatCanet
             MoistureQuantiles[4] = sortedmoist[(72 * sortedmoist.Length / 100) - 1];
             MoistureQuantiles[5] = sortedmoist[(89 * sortedmoist.Length / 100) - 1];
             MoistureQuantiles[6] = sortedmoist[(97 * sortedmoist.Length / 100) - 1];
+        }
+
+        public int GetQuantile(float[] quantiles, int x, int y, Heightmap map)
+        {
+            int quan = 0;
+            for (; quan < quantiles.Length; ++quan)
+            {
+                if (map[x, y] < quantiles[quan])
+                    break;
+            }
+            return quan;
         }
 
         public void GenerateAltitudeMap()
@@ -127,8 +138,8 @@ namespace PlatCanet
             Altitude.Normalize(0, 255);
 
             Perlin moistureNoiseBase = new Perlin();
-            moistureNoiseBase.Persistence = 0.03;
-            moistureNoiseBase.Frequency = 0.6;
+            moistureNoiseBase.Persistence = 0.2;
+            moistureNoiseBase.Frequency = 1;
             moistureNoiseBase.OctaveCount = 8;
             moistureNoiseBase.Seed = Seed;
 
@@ -194,7 +205,7 @@ namespace PlatCanet
 
         private void CreateRegions(csDelaunay.Voronoi v)
         {
-            List<HashSet<RegionCell>> regions = new List<HashSet<RegionCell>>();
+            /*List<HashSet<RegionCell>> regions = new List<HashSet<RegionCell>>();
             HashSet<Site> unprocessedSites = new HashSet<Site>(v.SitesIndexedByLocation.Values);
             Queue<RegionCell> processQueue = new Queue<RegionCell>();
 
@@ -219,8 +230,8 @@ namespace PlatCanet
                         unprocessedSites.Remove(s);
                     }
                 }
-            }
-            Regions = new HashSet<HashSet<RegionCell>>(regions);
+            }*/
+            //Regions = new HashSet<HashSet<RegionCell>>(regions);
         }
 
         public Biome Classify(Vector2f s)
@@ -229,29 +240,15 @@ namespace PlatCanet
         }
         public Biome Classify(int x, int y)
         {
-            float temp = Temperature[x, y], height = Altitude[x, y], moisture = Moisture[x, y];
+            if (Altitude[x, y] < World.SeaLevel)
+                return new Biome(SubBiomeType.Ocean); //make it all lakes, then flood-fill the oceanic region after.
 
-            if (height < World.SeaLevel)
-                return temp < World.GlacialTemp ? Biome.Glacier : Biome.Lake; //make it all lakes, then flood-fill the oceanic region after.
+            if (Altitude[x, y] > World.SeaLevel && Altitude[x, y] < BeachEnd)
+                return new Biome(SubBiomeType.Beach);
+            if (Altitude[x, y] > World.MountainLevel)
+                return new Biome(SubBiomeType.Mountain);
 
-            if (height > World.SeaLevel && height < BeachEnd)
-                return Biome.Beach;
-            if (height > World.MountainLevel)
-                return Biome.Mountain;
-
-            if (temp < 0.2f)
-                return Biome.Arctic;
-            if (temp < 0.30f)
-                return moisture > 0.45f ? Biome.AlpineTundra : Biome.Tundra;
-            if(temp < 0.60f)
-            {
-                if (moisture < 0.25f)
-                    return moisture > 5 ? Biome.Shrubland : Biome.Grasslands;
-                if (temp < 0.4f)
-                    return Biome.BorealForest;
-                return moisture < 0.35f ? Biome.Savanna : moisture < 0.5f ? Biome.TemperateForest : Biome.Rainforest;
-            }
-            return moisture < 0.25f ? Biome.Desert : moisture < 0.5f ? Biome.TropicalForest : Biome.TropicalRainforest;
+            return Biomes.Classify(GetQuantile(TemperatureQuantiles, x, y, Temperature), GetQuantile(MoistureQuantiles, x, y, Moisture));
         }
     }
 }

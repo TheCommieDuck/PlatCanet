@@ -36,7 +36,7 @@ namespace PlatCanet
         public Game()
         {
             IsRunning = true;
-            CurrentDisplayMode = MapRender.RenderType.Moisture;
+            CurrentDisplayMode = MapRender.RenderType.BlendedBiomeTerrain;
         }
 
         public void Run()
@@ -132,8 +132,7 @@ namespace PlatCanet
             Window.Print(infoPanel, x, y + 4, "X: {0}, Y: {1}", mapX, mapY);
             Window.Print(infoPanel, x, y + 8, "Temperature: {0:0.0}°C", (World.Temperature[mapX, mapY] * 70) - 20);
             Window.Print(infoPanel, x, y + 12, "Rainfall: Approx {0:0.00}mm/year", (World.Moisture[mapX, mapY] * 3500));
-            Window.Print(infoPanel, x, y + 16, "Biome: {0}", 
-                String.Concat(World.Classify(mapX, mapY).ToString().Select(c => Char.IsUpper(c) ? " " + c : c.ToString())).TrimStart(' '));
+            Window.Print(infoPanel, x, y + 16, "Biome: {0}", World.Classify(mapX, mapY).ToString());
             Window.Print(infoPanel, x, y + 20, "Altitude: {0:0.0}", World.Altitude[mapX, mapY]);
             
             Window.DrawBorders(infoPanel);

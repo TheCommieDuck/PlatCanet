@@ -98,7 +98,8 @@ namespace PlatCanet
                     for(int dy = -1; dy < 2; ++dy)
                     {
                         float neighbour = distances[x, y] + ((dy == 0 || dx == 0) ? 1f : 1.33f);
-
+                        if (x + dx < 0 || x + dx >= Width || y + dy < 0 || y + dy >= Height)
+                            continue;
                         if (distances[x + dx, y + dy] == -1 || distances[x + dx, y + dy] > neighbour)
                         {
                             distances[x + dx, y + dy] = neighbour;
@@ -113,7 +114,8 @@ namespace PlatCanet
             {
                 for (int y = 0; y < Height; ++y)
                 {
-                    this[x, y] += ((maxDist - distances[x, y])*2f/maxDist);
+                    this[x, y] += 0.8f*((maxDist - distances[x, y])/maxDist);
+                    this[x, y] /= 1.8f;
                 }
             }
         }
